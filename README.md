@@ -10,10 +10,12 @@ It follows the layout of a modern Apple Finder, on top of the classic NeXT / Win
 | **Path bar** | Editable path + **Go** · **Find** filter (list view) |
 | **Sidebar** | Favorites: Home, Desktop, Documents, Downloads, media, … |
 | **Columns** | NeXT-style multi-column browser (default) |
-| **List** | Name · size · kind · modified |
-| **Get Info** | Preview panel for the selection |
-| **Context menu** | Right-click: Open, Rename, Duplicate, Delete, Compress, Copy/Paste, Terminal… |
+| **List** | Name · size · kind · modified (click headers to sort) |
+| **Get Info** | Preview panel: text, images, folder listing, metadata |
+| **Context menu** | Right-click: Open, Rename, Duplicate, Delete, Compress, Copy / Paste, Copy Path, Terminal… |
 | **Status** | Folder / file counts and size on disk |
+
+Version **0.1.0**.
 
 ## Build
 
@@ -24,6 +26,13 @@ make
 ./winder
 # or
 ./winder ~/Documents
+```
+
+Options:
+
+```sh
+winder --help      # usage
+winder --version   # print version
 ```
 
 ## Install
@@ -46,6 +55,7 @@ make print-paths               # show where files will go
 | `$(PREFIX)/share/man/man1/winder.1` | man page |
 | `$(PREFIX)/share/applications/winder.desktop` | desktop entry |
 | `$(PREFIX)/share/doc/winder/README.md` | docs |
+| `$(PREFIX)/share/doc/winder/LICENSE` | license |
 
 ## Use
 
@@ -58,7 +68,23 @@ make print-paths               # show where files will go
 | Rename / Delete | Select an item, then **Rename** or **Delete** |
 | Hidden files | Toggle **Hidden** |
 | Filter | Switch to **List**, type in **Find** |
+| Sort | In **List**, click a column header (Name, Size, Kind, Date) |
 | Context menu | Right-click a file, folder, or empty area |
+| Copy / Paste | Context menu **Copy** then **Paste** into a folder |
+| Compress | Context menu **Compress…** (creates a `.tar.gz`) |
+| Terminal | Context menu **Open Terminal Here** |
+
+## Keyboard
+
+When focus is on a browse surface (file list, column browser, or sidebar), not the path or Find fields:
+
+| Key | Action |
+|-----|--------|
+| Up / Down | Move the selection |
+| Left / Right | Columns: parent column or open folder. List: go back or open |
+| Enter | Open the selection |
+| `/` | Focus the Find field |
+| Escape | Return focus to the file view |
 
 ## Window Maker tip
 
@@ -68,7 +94,7 @@ From a terminal:
 winder &
 ```
 
-Or put it on the dock / root menu as a plain application.
+Or put it on the dock / root menu as a plain application. A desktop entry is installed as `winder.desktop`.
 
 ## Layout of the tree
 
@@ -76,6 +102,11 @@ Or put it on the dock / root menu as a plain application.
 winder/
 ├── Makefile
 ├── README.md
+├── LICENSE
+├── data/
+│   └── winder.desktop
+├── man/
+│   └── winder.1
 ├── winder          # binary after make
 └── src/
     ├── winder.h    # shared types & API
@@ -87,6 +118,10 @@ winder/
     └── menu.c      # right-click context menu
 ```
 
+## Author
+
+Dobroslav Slavenskoj
+
 ## License
 
-GPL-2.0-or-later (same family as Window Maker / WINGs).
+MIT License. See [LICENSE](LICENSE).

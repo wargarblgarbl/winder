@@ -72,6 +72,7 @@ distclean: clean
 #   $(MAN1DIR)/winder.1
 #   $(APPLICATIONSDIR)/winder.desktop
 #   $(DOCDIR)/README.md
+#   $(DOCDIR)/LICENSE
 install: $(APP)
 	$(INSTALL_DIR) $(DESTDIR)$(BINDIR)
 	$(INSTALL_DIR) $(DESTDIR)$(MAN1DIR)
@@ -81,6 +82,7 @@ install: $(APP)
 	$(INSTALL_DATA) man/winder.1 $(DESTDIR)$(MAN1DIR)/winder.1
 	$(INSTALL_DATA) data/winder.desktop $(DESTDIR)$(APPLICATIONSDIR)/winder.desktop
 	$(INSTALL_DATA) README.md $(DESTDIR)$(DOCDIR)/README.md
+	$(INSTALL_DATA) LICENSE $(DESTDIR)$(DOCDIR)/LICENSE
 	@echo "Installed $(APP) $(VERSION) under $(DESTDIR)$(PREFIX)"
 
 install-strip: $(APP)
@@ -91,6 +93,7 @@ uninstall:
 	$(RM) $(DESTDIR)$(MAN1DIR)/winder.1
 	$(RM) $(DESTDIR)$(APPLICATIONSDIR)/winder.desktop
 	$(RM) $(DESTDIR)$(DOCDIR)/README.md
+	$(RM) $(DESTDIR)$(DOCDIR)/LICENSE
 	-rmdir $(DESTDIR)$(DOCDIR) 2>/dev/null || true
 	@echo "Removed $(APP) from $(DESTDIR)$(PREFIX)"
 

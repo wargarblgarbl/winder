@@ -16,7 +16,8 @@ winder \- native WINGs file manager for Window Maker
 is a Finder-inspired file manager built with the WINGs toolkit used by
 Window Maker. It provides a favorites sidebar, NeXT-style column browsing,
 a list view with sortable headers, Get Info previews (text, images, folders),
-and basic file operations.
+a right-click context menu, and basic file operations (open, rename, delete,
+duplicate, compress, copy/paste, open terminal).
 .SH OPTIONS
 .TP
 .I directory
@@ -46,6 +47,11 @@ Return focus to the file view.
 .TP
 .B Enter
 Open the selection.
+.SH CONTEXT MENU
+Right-click a file, folder, or empty area in the column or list view.
+Item actions include Open, Rename, Duplicate, Delete, Compress, Copy,
+Copy Path, Paste, and Open Terminal Here. Background actions operate on the
+current folder (for example New Folder, Paste, Terminal).
 .SH FILES
 No configuration files are used yet. Sidebar favorites are derived from the
 user's home directory and common paths.
@@ -53,6 +59,9 @@ user's home directory and common paths.
 .BR wmaker (1),
 .BR xdg-open (1)
 .SH AUTHOR
-Written for Window Maker / WINGs.
+Written by Dobroslav Slavenskoj for Window Maker / WINGs.
 .SH COPYRIGHT
-License GPL-2.0-or-later.
+Copyright (c) 2026 Dobroslav Slavenskoj.
+License MIT.
+.PP
+See the LICENSE file in the source distribution.

@@ -1,7 +1,7 @@
 /* Winder — native WINGs file manager (Finder-inspired)
  *
- * Copyright (c) 2026
- * Licensed under the GNU GPL version 2 or later.
+ * Copyright (c) 2026 Dobroslav Slavenskoj
+ * Licensed under the MIT License. See LICENSE.
  */
 #ifndef WINDER_H
 #define WINDER_H
