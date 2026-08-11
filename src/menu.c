@@ -114,14 +114,26 @@ static void ctx_button_action(WMWidget *self, void *data)
     }
 }
 
+/* True if root coords lie inside the menu's outer frame. */
+static int ctx_pointer_inside_menu(Display *dpy, Window menu_xid, int rx, int ry)
+{
+    Window root;
+    int mx, my;
+    unsigned mw, mh, b, d;
+
+    if (menu_xid == None)
+        return 0;
+    if (!XGetGeometry(dpy, menu_xid, &root, &mx, &my, &mw, &mh, &b, &d))
+        return 0;
+    return (rx >= mx && ry >= my &&
+            rx < mx + (int)mw && ry < my + (int)mh);
+}
+
 static void ctx_event_handler(XEvent *event, void *data)
 {
     WinderApp *app = (WinderApp *)data;
     Window menu_xid;
     Display *dpy;
-    int mx, my;
-    unsigned mw, mh, b, d;
-    Window root;
 
     if (!app->ctxVisible || !app->ctxMenu)
         return;
@@ -133,21 +145,34 @@ static void ctx_event_handler(XEvent *event, void *data)
 
     switch (event->type) {
     case ButtonPress: {
-        /*
-         * With an active pointer grab (owner_events=True), outside clicks are
-         * often reported to the grab window. Use root coordinates vs menu
-         * geometry so "click outside" always dismisses.
-         */
-        if (!XGetGeometry(dpy, menu_xid, &root, &mx, &my, &mw, &mh, &b, &d)) {
+        /* Click outside dismisses (grab may report events on the menu win). */
+        if (!ctx_pointer_inside_menu(dpy, menu_xid,
+                                     event->xbutton.x_root,
+                                     event->xbutton.y_root))
             context_menu_hide(app);
+        break;
+    }
+    case LeaveNotify: {
+        /*
+         * Close when the pointer leaves the menu. Ignore inferior notifies
+         * (moving onto a child button still counts as inside the menu).
+         */
+        if (event->xcrossing.mode != NotifyNormal)
             break;
-        }
-        {
-            int rx = event->xbutton.x_root;
-            int ry = event->xbutton.y_root;
-            if (rx < mx || ry < my || rx >= mx + (int)mw || ry >= my + (int)mh)
-                context_menu_hide(app);
-        }
+        if (event->xcrossing.detail == NotifyInferior)
+            break;
+        if (!ctx_pointer_inside_menu(dpy, menu_xid,
+                                     event->xcrossing.x_root,
+                                     event->xcrossing.y_root))
+            context_menu_hide(app);
+        break;
+    }
+    case MotionNotify: {
+        /* While grabbed, motion may only hit the grab window — dismiss if out. */
+        if (!ctx_pointer_inside_menu(dpy, menu_xid,
+                                     event->xmotion.x_root,
+                                     event->xmotion.y_root))
+            context_menu_hide(app);
         break;
     }
     case KeyPress: {
@@ -204,7 +229,8 @@ void context_menu_init(WinderApp *app)
         WMUnmapWidget(app->ctxMenu);
 
     WMCreateEventHandler(WMWidgetView(app->ctxMenu),
-                         ButtonPressMask | KeyPressMask,
+                         ButtonPressMask | KeyPressMask | LeaveWindowMask |
+                         EnterWindowMask | PointerMotionMask,
                          ctx_event_handler, app);
 }
 
@@ -338,7 +364,8 @@ void context_menu_show(WinderApp *app, int root_x, int root_y,
      * and our handler can dismiss via root coordinates.
      */
     XGrabPointer(dpy, xid, False,
-                 ButtonPressMask | ButtonReleaseMask,
+                 ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
+                 LeaveWindowMask | EnterWindowMask,
                  GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
     XGrabKeyboard(dpy, xid, False,
                   GrabModeAsync, GrabModeAsync, CurrentTime);
