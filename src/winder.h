@@ -65,6 +65,9 @@
 
 #define HISTORY_MAX         64
 #define SIDEBAR_MAX         24
+#define CTX_MENU_MAX_ITEMS  16
+#define CTX_MENU_ITEM_H     24
+#define CTX_MENU_W          180
 
 typedef enum {
     VIEW_COLUMNS = 0,
@@ -174,6 +177,18 @@ typedef struct WinderApp {
     WMFrame   *statusBar;
     WMLabel   *statusLabel;
 
+    /* right-click context menu (borderless popup) */
+    WMWindow  *ctxMenu;
+    WMFrame   *ctxFrame;
+    WMButton  *ctxButtons[CTX_MENU_MAX_ITEMS];
+    int        ctxButtonCount;
+    char       ctxPath[PATH_MAX];   /* target of the menu, or "" for background */
+    int        ctxIsBackground;     /* 1 = empty area / current folder */
+    int        ctxVisible;
+
+    /* simple in-app clipboard for copy/paste of paths */
+    char       clipboardPath[PATH_MAX];
+
     /* state */
     char           currentPath[PATH_MAX];
     char           filter[256];
@@ -204,6 +219,13 @@ int   fs_exists(const char *path);
 int   fs_mkdir(const char *path);
 int   fs_remove_path(const char *path);
 int   fs_rename_path(const char *from, const char *to);
+int   fs_duplicate(const char *path, char *out_path, size_t out_len);
+int   fs_compress_tar_gz(const char *path, char *out_path, size_t out_len);
+int   fs_copy_into_dir(const char *src, const char *dest_dir, char *out_path,
+                       size_t out_len);
+int   fs_run_command(char *const argv[]);
+void  fs_copy_path_to_clipboard(const char *path);
+int   fs_open_terminal(const char *dir);
 void  fs_format_size(off_t size, char *buf, size_t buflen);
 void  fs_format_time(time_t t, char *buf, size_t buflen);
 void  fs_format_mode(mode_t mode, char *buf, size_t buflen);
@@ -252,6 +274,19 @@ void action_open(WMWidget *self, void *data);
 void action_view_columns(WMWidget *self, void *data);
 void action_view_list(WMWidget *self, void *data);
 void action_toggle_hidden(WMWidget *self, void *data);
+void action_duplicate(WMWidget *self, void *data);
+void action_compress(WMWidget *self, void *data);
+void action_copy_path(WMWidget *self, void *data);
+void action_copy_item(WMWidget *self, void *data);
+void action_paste_item(WMWidget *self, void *data);
+void action_terminal(WMWidget *self, void *data);
+
+/* context menu */
+void context_menu_init(WinderApp *app);
+void context_menu_show(WinderApp *app, int root_x, int root_y,
+                       const char *path, int is_background);
+void context_menu_hide(WinderApp *app);
+void context_menu_attach_list(WinderApp *app, WMList *list);
 
 void sidebar_select(WMWidget *self, void *data);
 void browser_click(WMWidget *self, void *data);

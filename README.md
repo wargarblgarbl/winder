@@ -12,6 +12,7 @@ It follows the layout of a modern Apple Finder, on top of the classic NeXT / Win
 | **Columns** | NeXT-style multi-column browser (default) |
 | **List** | Name · size · kind · modified |
 | **Get Info** | Preview panel for the selection |
+| **Context menu** | Right-click: Open, Rename, Duplicate, Delete, Compress, Copy/Paste, Terminal… |
 | **Status** | Folder / file counts and size on disk |
 
 ## Build
@@ -57,6 +58,7 @@ make print-paths               # show where files will go
 | Rename / Delete | Select an item, then **Rename** or **Delete** |
 | Hidden files | Toggle **Hidden** |
 | Filter | Switch to **List**, type in **Find** |
+| Context menu | Right-click a file, folder, or empty area |
 
 ## Window Maker tip
 

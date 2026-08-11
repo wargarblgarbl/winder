@@ -1038,6 +1038,8 @@ void winder_set_path(WinderApp *app, const char *path, int push_history)
     if (!path || !*path)
         return;
 
+    context_menu_hide(app);
+
     norm = fs_normalize(path);
     if (!fs_is_dir(norm)) {
         /* if it's a file, open parent and select later — for now stay put */
@@ -1660,9 +1662,11 @@ static void ensure_browser_key_handlers(WinderApp *app)
     n = WMGetBrowserNumberOfColumns(app->browser);
     for (i = 0; i < n; i++) {
         WMList *list = WMGetBrowserListInColumn(app->browser, i);
-        if (list)
+        if (list) {
             WMCreateEventHandler(WMWidgetView(list), KeyPressMask,
                                  winder_key_handler, app);
+            context_menu_attach_list(app, list);
+        }
     }
     WMCreateEventHandler(WMWidgetView(app->browser), KeyPressMask,
                          winder_key_handler, app);
@@ -1684,6 +1688,9 @@ static void install_key_handlers(WinderApp *app)
     WMCreateEventHandler(WMWidgetView(app->toolbar), KeyPressMask,
                          winder_key_handler, app);
     ensure_browser_key_handlers(app);
+
+    context_menu_attach_list(app, app->listView);
+    context_menu_attach_list(app, app->sidebar);
 }
 
 /* ---- UI construction ---- */
@@ -1934,6 +1941,7 @@ void winder_build_ui(WinderApp *app)
     browser_ensure_loaded(app);
     list_update_sort_headers(app);
 
+    context_menu_init(app);
     install_key_handlers(app);
 
     winder_layout(app);

@@ -1,6 +1,8 @@
 /* Filesystem helpers for Winder */
 #include "winder.h"
 
+#include <fcntl.h>
+
 char *fs_home_dir(void)
 {
     const char *h = getenv("HOME");
@@ -154,6 +156,259 @@ int fs_remove_path(const char *path)
 int fs_rename_path(const char *from, const char *to)
 {
     return rename(from, to);
+}
+
+int fs_run_command(char *const argv[])
+{
+    pid_t pid;
+    int status;
+
+    if (!argv || !argv[0])
+        return -1;
+    pid = fork();
+    if (pid < 0)
+        return -1;
+    if (pid == 0) {
+        /* child: quiet stdio for GUI helper tools */
+        int devnull = open("/dev/null", O_RDWR);
+        if (devnull >= 0) {
+            dup2(devnull, STDIN_FILENO);
+            dup2(devnull, STDOUT_FILENO);
+            dup2(devnull, STDERR_FILENO);
+            if (devnull > 2)
+                close(devnull);
+        }
+        execvp(argv[0], argv);
+        _exit(127);
+    }
+    if (waitpid(pid, &status, 0) < 0)
+        return -1;
+    if (WIFEXITED(status))
+        return WEXITSTATUS(status);
+    return -1;
+}
+
+static int unique_path(const char *dir, const char *base, const char *suffix,
+                       char *out, size_t out_len)
+{
+    char candidate[PATH_MAX];
+    int n;
+
+    if (strcmp(dir, "/") == 0)
+        snprintf(candidate, sizeof(candidate), "/%s%s", base, suffix ? suffix : "");
+    else
+        snprintf(candidate, sizeof(candidate), "%s/%s%s", dir, base,
+                 suffix ? suffix : "");
+    if (!fs_exists(candidate)) {
+        wstrlcpy(out, candidate, out_len);
+        return 0;
+    }
+    for (n = 2; n < 1000; n++) {
+        if (strcmp(dir, "/") == 0)
+            snprintf(candidate, sizeof(candidate), "/%s %d%s", base, n,
+                     suffix ? suffix : "");
+        else
+            snprintf(candidate, sizeof(candidate), "%s/%s %d%s", dir, base, n,
+                     suffix ? suffix : "");
+        if (!fs_exists(candidate)) {
+            wstrlcpy(out, candidate, out_len);
+            return 0;
+        }
+    }
+    return -1;
+}
+
+int fs_duplicate(const char *path, char *out_path, size_t out_len)
+{
+    char *parent, *base, *dot;
+    char stem[NAME_MAX + 1];
+    char dest[PATH_MAX];
+    char *argv[8];
+    int rc;
+
+    if (!path || !fs_exists(path))
+        return -1;
+    parent = fs_dirname(path);
+    base = fs_basename(path);
+
+    /* "file.txt" -> "file copy.txt"; dirs -> "name copy" */
+    wstrlcpy(stem, base, sizeof(stem));
+    if (!fs_is_dir(path) && (dot = strrchr(stem, '.')) && dot != stem) {
+        char ext[64];
+        wstrlcpy(ext, dot, sizeof(ext));
+        *dot = '\0';
+        {
+            char with_copy[NAME_MAX + 16];
+            snprintf(with_copy, sizeof(with_copy), "%s copy", stem);
+            if (unique_path(parent, with_copy, ext, dest, sizeof(dest)) != 0) {
+                wfree(parent);
+                wfree(base);
+                return -1;
+            }
+        }
+    } else {
+        char with_copy[NAME_MAX + 16];
+        snprintf(with_copy, sizeof(with_copy), "%s copy", stem);
+        if (unique_path(parent, with_copy, "", dest, sizeof(dest)) != 0) {
+            wfree(parent);
+            wfree(base);
+            return -1;
+        }
+    }
+
+    argv[0] = "cp";
+    argv[1] = "-a";
+    argv[2] = (char *)path;
+    argv[3] = dest;
+    argv[4] = NULL;
+    rc = fs_run_command(argv);
+    if (rc == 0 && out_path && out_len)
+        wstrlcpy(out_path, dest, out_len);
+    wfree(parent);
+    wfree(base);
+    return rc == 0 ? 0 : -1;
+}
+
+int fs_compress_tar_gz(const char *path, char *out_path, size_t out_len)
+{
+    char *parent, *base;
+    char dest[PATH_MAX];
+    char *argv[12];
+    int rc;
+
+    if (!path || !fs_exists(path))
+        return -1;
+    parent = fs_dirname(path);
+    base = fs_basename(path);
+
+    if (unique_path(parent, base, ".tar.gz", dest, sizeof(dest)) != 0) {
+        wfree(parent);
+        wfree(base);
+        return -1;
+    }
+
+    /* tar -czf dest -C parent base */
+    argv[0] = "tar";
+    argv[1] = "-czf";
+    argv[2] = dest;
+    argv[3] = "-C";
+    argv[4] = parent;
+    argv[5] = base;
+    argv[6] = NULL;
+    rc = fs_run_command(argv);
+    if (rc == 0 && out_path && out_len)
+        wstrlcpy(out_path, dest, out_len);
+    wfree(parent);
+    wfree(base);
+    return rc == 0 ? 0 : -1;
+}
+
+int fs_copy_into_dir(const char *src, const char *dest_dir, char *out_path,
+                     size_t out_len)
+{
+    char *base;
+    char dest[PATH_MAX];
+    char *argv[8];
+    int rc;
+
+    if (!src || !dest_dir || !fs_exists(src) || !fs_is_dir(dest_dir))
+        return -1;
+    base = fs_basename(src);
+    if (unique_path(dest_dir, base, "", dest, sizeof(dest)) != 0) {
+        wfree(base);
+        return -1;
+    }
+    argv[0] = "cp";
+    argv[1] = "-a";
+    argv[2] = (char *)src;
+    argv[3] = dest;
+    argv[4] = NULL;
+    rc = fs_run_command(argv);
+    if (rc == 0 && out_path && out_len)
+        wstrlcpy(out_path, dest, out_len);
+    wfree(base);
+    return rc == 0 ? 0 : -1;
+}
+
+void fs_copy_path_to_clipboard(const char *path)
+{
+    char *argv[8];
+    int pipes[2];
+    pid_t pid;
+
+    if (!path || !path[0])
+        return;
+
+    /* Prefer xclip, then xsel; ignore failure (path still in app clipboard). */
+    if (pipe(pipes) == 0) {
+        pid = fork();
+        if (pid == 0) {
+            const char *tools[][6] = {
+                { "xclip", "-selection", "clipboard", NULL },
+                { "xsel", "--clipboard", "--input", NULL },
+                { NULL }
+            };
+            int t;
+            close(pipes[1]);
+            dup2(pipes[0], STDIN_FILENO);
+            close(pipes[0]);
+            for (t = 0; tools[t][0]; t++) {
+                char *av[8];
+                int i;
+                for (i = 0; tools[t][i]; i++)
+                    av[i] = (char *)tools[t][i];
+                av[i] = NULL;
+                execvp(av[0], av);
+            }
+            _exit(127);
+        } else if (pid > 0) {
+            ssize_t len = (ssize_t)strlen(path);
+            close(pipes[0]);
+            if (write(pipes[1], path, (size_t)len) != len) {
+                /* ignore */
+            }
+            close(pipes[1]);
+            waitpid(pid, NULL, 0);
+            return;
+        }
+        close(pipes[0]);
+        close(pipes[1]);
+    }
+    (void)argv;
+}
+
+int fs_open_terminal(const char *dir)
+{
+    char *argv[12];
+    const char *term;
+    pid_t pid;
+
+    if (!dir || !fs_is_dir(dir))
+        return -1;
+
+    term = getenv("TERMINAL");
+    if (!term || !term[0])
+        term = getenv("TERMCMD");
+
+    pid = fork();
+    if (pid < 0)
+        return -1;
+    if (pid == 0) {
+        if (chdir(dir) != 0)
+            _exit(126);
+        if (term && term[0]) {
+            execlp(term, term, (char *)NULL);
+        }
+        /* common fallbacks */
+        execlp("x-terminal-emulator", "x-terminal-emulator", (char *)NULL);
+        execlp("xterm", "xterm", (char *)NULL);
+        execlp("uxterm", "uxterm", (char *)NULL);
+        execlp("kitty", "kitty", (char *)NULL);
+        execlp("alacritty", "alacritty", (char *)NULL);
+        _exit(127);
+    }
+    (void)argv;
+    return 0;
 }
 
 void fs_format_size(off_t size, char *buf, size_t buflen)

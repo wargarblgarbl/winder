@@ -47,7 +47,7 @@ else
   CFLAGS += $(shell $(PKG_CONFIG) --cflags WINGs 2>/dev/null)
 endif
 
-SRCS = src/main.c src/ui.c src/actions.c src/fsutil.c src/history.c
+SRCS = src/main.c src/ui.c src/actions.c src/fsutil.c src/history.c src/menu.c
 OBJS = $(SRCS:.c=.o)
 
 .PHONY: all clean distclean install install-strip uninstall run \

@@ -310,6 +310,141 @@ void action_open(WMWidget *self, void *data)
     wfree(sel);
 }
 
+void action_duplicate(WMWidget *self, void *data)
+{
+    WinderApp *app = (WinderApp *)data;
+    char *sel;
+    char out[PATH_MAX];
+    char msg[512];
+    (void)self;
+
+    sel = winder_selected_path(app);
+    if (!sel || strcmp(sel, "/") == 0 || strcmp(sel, app->currentPath) == 0) {
+        WMRunAlertPanel(app->scr, app->win, "Duplicate",
+                        "Select a file or folder to duplicate.",
+                        "OK", NULL, NULL);
+        if (sel) wfree(sel);
+        return;
+    }
+    if (fs_duplicate(sel, out, sizeof(out)) != 0) {
+        snprintf(msg, sizeof(msg), "Could not duplicate:\n%s\n(%s)",
+                 sel, strerror(errno));
+        WMRunAlertPanel(app->scr, app->win, "Error", msg, "OK", NULL, NULL);
+    } else {
+        winder_refresh(app);
+    }
+    wfree(sel);
+}
+
+void action_compress(WMWidget *self, void *data)
+{
+    WinderApp *app = (WinderApp *)data;
+    char *sel;
+    char out[PATH_MAX];
+    char msg[512];
+    (void)self;
+
+    sel = winder_selected_path(app);
+    if (!sel || strcmp(sel, "/") == 0 || strcmp(sel, app->currentPath) == 0) {
+        WMRunAlertPanel(app->scr, app->win, "Compress",
+                        "Select a file or folder to compress.",
+                        "OK", NULL, NULL);
+        if (sel) wfree(sel);
+        return;
+    }
+    if (fs_compress_tar_gz(sel, out, sizeof(out)) != 0) {
+        snprintf(msg, sizeof(msg),
+                 "Could not create archive for:\n%s\n\n"
+                 "(Needs tar. Check write permission.)",
+                 sel);
+        WMRunAlertPanel(app->scr, app->win, "Error", msg, "OK", NULL, NULL);
+    } else {
+        char *base = fs_basename(out);
+        snprintf(msg, sizeof(msg), "Created archive:\n%s", base);
+        wfree(base);
+        WMRunAlertPanel(app->scr, app->win, "Compress", msg, "OK", NULL, NULL);
+        winder_refresh(app);
+    }
+    wfree(sel);
+}
+
+void action_copy_path(WMWidget *self, void *data)
+{
+    WinderApp *app = (WinderApp *)data;
+    char *sel;
+    (void)self;
+
+    sel = winder_selected_path(app);
+    if (!sel) {
+        WMRunAlertPanel(app->scr, app->win, "Copy Path",
+                        "Nothing is selected.", "OK", NULL, NULL);
+        return;
+    }
+    wstrlcpy(app->clipboardPath, sel, sizeof(app->clipboardPath));
+    fs_copy_path_to_clipboard(sel);
+    wfree(sel);
+}
+
+void action_copy_item(WMWidget *self, void *data)
+{
+    WinderApp *app = (WinderApp *)data;
+    char *sel;
+    (void)self;
+
+    sel = winder_selected_path(app);
+    if (!sel || strcmp(sel, "/") == 0) {
+        WMRunAlertPanel(app->scr, app->win, "Copy",
+                        "Select a file or folder to copy.",
+                        "OK", NULL, NULL);
+        if (sel) wfree(sel);
+        return;
+    }
+    /* For Paste we need the item path, not only as text */
+    wstrlcpy(app->clipboardPath, sel, sizeof(app->clipboardPath));
+    fs_copy_path_to_clipboard(sel);
+    wfree(sel);
+}
+
+void action_paste_item(WMWidget *self, void *data)
+{
+    WinderApp *app = (WinderApp *)data;
+    char *dir;
+    char out[PATH_MAX];
+    char msg[512];
+    (void)self;
+
+    if (!app->clipboardPath[0] || !fs_exists(app->clipboardPath)) {
+        WMRunAlertPanel(app->scr, app->win, "Paste",
+                        "Clipboard is empty or the source is gone.",
+                        "OK", NULL, NULL);
+        return;
+    }
+    dir = winder_selected_directory(app);
+    if (fs_copy_into_dir(app->clipboardPath, dir, out, sizeof(out)) != 0) {
+        snprintf(msg, sizeof(msg), "Could not paste into:\n%s", dir);
+        WMRunAlertPanel(app->scr, app->win, "Error", msg, "OK", NULL, NULL);
+    } else {
+        winder_refresh(app);
+    }
+    wfree(dir);
+}
+
+void action_terminal(WMWidget *self, void *data)
+{
+    WinderApp *app = (WinderApp *)data;
+    char *dir;
+    (void)self;
+
+    dir = winder_selected_directory(app);
+    if (fs_open_terminal(dir) != 0) {
+        WMRunAlertPanel(app->scr, app->win, "Terminal",
+                        "Could not open a terminal.\n"
+                        "Set $TERMINAL or install xterm.",
+                        "OK", NULL, NULL);
+    }
+    wfree(dir);
+}
+
 /* ---- widget callbacks ---- */
 void sidebar_select(WMWidget *self, void *data)
 {
