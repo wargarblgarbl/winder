@@ -14,10 +14,11 @@ winder \- native WINGs file manager for Window Maker
 .SH DESCRIPTION
 .B winder
 is a Finder-inspired file manager built with the WINGs toolkit used by
-Window Maker. It provides a favorites sidebar, NeXT-style column browsing,
-a list view with sortable headers, Get Info previews (text, images, folders),
-a right-click context menu, and basic file operations (open, rename, delete,
-duplicate, compress, copy/paste, open terminal).
+Window Maker. It provides a favorites sidebar, a list view with sortable
+headers (the default on start), NeXT-style column browsing, Get Info
+previews (text, images, folders), a right-click context menu, and basic
+file operations (open, rename, delete, duplicate, compress, copy/paste,
+open terminal).
 .SH OPTIONS
 .TP
 .I directory
@@ -47,11 +48,20 @@ Return focus to the file view.
 .TP
 .B Enter
 Open the selection.
+.TP
+.B Mouse Back / Forward
+Side buttons on many mice (X11 buttons 8 and 9) move history back and
+forward, same as the toolbar
+.B <
+and
+.B >
+buttons.
 .SH CONTEXT MENU
 Right-click a file, folder, or empty area in the column or list view.
-Item actions include Open, Rename, Duplicate, Delete, Compress, Copy,
-Copy Path, Paste, and Open Terminal Here. Background actions operate on the
-current folder (for example New Folder, Paste, Terminal).
+Item actions include Open, Open in New Window (folders only), Rename,
+Duplicate, Delete, Compress, Copy, Copy Path, Paste, and Open Terminal Here.
+Background actions operate on the current folder (for example New Folder,
+Paste, Terminal).
 .SH FILES
 No configuration files are used yet. Sidebar favorites are derived from the
 user's home directory and common paths.

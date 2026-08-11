@@ -9,10 +9,10 @@ It follows the layout of a modern Apple Finder, on top of the classic NeXT / Win
 | **Toolbar** | Back, Forward, Up, Home · Columns / List · New, Delete, Rename, Open · Reload · Hidden |
 | **Path bar** | Editable path + **Go** · **Find** filter (list view) |
 | **Sidebar** | Favorites: Home, Desktop, Documents, Downloads, media, … |
-| **Columns** | NeXT-style multi-column browser (default) |
-| **List** | Name · size · kind · modified (click headers to sort) |
+| **Columns** | NeXT-style multi-column browser |
+| **List** | Name · size · kind · modified (default; click headers to sort) |
 | **Get Info** | Preview panel: text, images, folder listing, metadata |
-| **Context menu** | Right-click: Open, Rename, Duplicate, Delete, Compress, Copy / Paste, Copy Path, Terminal… |
+| **Context menu** | Right-click: Open, Open in New Window (folders), Rename, Duplicate, Delete, Compress, Copy / Paste, Copy Path, Terminal… |
 | **Status** | Folder / file counts and size on disk |
 
 Version **0.1.0**.
@@ -85,6 +85,7 @@ When focus is on a browse surface (file list, column browser, or sidebar), not t
 | Enter | Open the selection |
 | `/` | Focus the Find field |
 | Escape | Return focus to the file view |
+| Mouse Back / Forward | History back / forward (side buttons) |
 
 ## Window Maker tip
 

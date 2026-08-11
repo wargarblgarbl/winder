@@ -226,6 +226,8 @@ int   fs_copy_into_dir(const char *src, const char *dest_dir, char *out_path,
 int   fs_run_command(char *const argv[]);
 void  fs_copy_path_to_clipboard(const char *path);
 int   fs_open_terminal(const char *dir);
+/* Launch another winder process on dir (non-blocking). Returns 0 on fork ok. */
+int   fs_open_in_new_window(const char *dir);
 void  fs_format_size(off_t size, char *buf, size_t buflen);
 void  fs_format_time(time_t t, char *buf, size_t buflen);
 void  fs_format_mode(mode_t mode, char *buf, size_t buflen);
@@ -271,6 +273,7 @@ void action_new_folder(WMWidget *self, void *data);
 void action_delete(WMWidget *self, void *data);
 void action_rename(WMWidget *self, void *data);
 void action_open(WMWidget *self, void *data);
+void action_open_new_window(WMWidget *self, void *data);
 void action_view_columns(WMWidget *self, void *data);
 void action_view_list(WMWidget *self, void *data);
 void action_toggle_hidden(WMWidget *self, void *data);

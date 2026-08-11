@@ -411,6 +411,38 @@ int fs_open_terminal(const char *dir)
     return 0;
 }
 
+int fs_open_in_new_window(const char *dir)
+{
+    pid_t pid;
+    char self[PATH_MAX];
+    ssize_t n;
+
+    if (!dir || !fs_is_dir(dir))
+        return -1;
+
+    pid = fork();
+    if (pid < 0)
+        return -1;
+    if (pid == 0) {
+        int devnull = open("/dev/null", O_RDWR);
+        if (devnull >= 0) {
+            dup2(devnull, STDIN_FILENO);
+            /* keep stdout/stderr for rare diagnostics from the child app */
+            if (devnull > 2)
+                close(devnull);
+        }
+        /* Prefer the same binary we are running. */
+        n = readlink("/proc/self/exe", self, sizeof(self) - 1);
+        if (n > 0) {
+            self[n] = '\0';
+            execl(self, "winder", dir, (char *)NULL);
+        }
+        execlp("winder", "winder", dir, (char *)NULL);
+        _exit(127);
+    }
+    return 0;
+}
+
 void fs_format_size(off_t size, char *buf, size_t buflen)
 {
     const char *units[] = { "B", "KB", "MB", "GB", "TB" };

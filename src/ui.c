@@ -1,10 +1,11 @@
 /* Main window layout, views, and navigation for Winder */
 #include "winder.h"
 
-/* keyboard helpers (defined later) */
+/* keyboard / pointer helpers (defined later) */
 static void ensure_browser_key_handlers(WinderApp *app);
 static void focus_file_surface(WinderApp *app);
 static void install_key_handlers(WinderApp *app);
+static void install_mouse_nav(WinderApp *app);
 static void winder_key_handler(XEvent *event, void *data);
 
 /* ---- sort helpers ---- */
@@ -1604,6 +1605,111 @@ static void handle_sidebar_nav(WinderApp *app, KeySym ksym)
 }
 
 /*
+ * Mouse side buttons (X11 Button8 / Button9) → history back / forward.
+ *
+ * Do NOT use XGrabButton here: passive grabs on the client window break
+ * Alt-drag window moving in Window Maker and other X11 WMs. Attach plain
+ * ButtonPress handlers to widgets instead (X delivers to the window under
+ * the pointer).
+ */
+static void winder_mouse_nav_handler(XEvent *event, void *data)
+{
+    WinderApp *app = (WinderApp *)data;
+
+    if (event->type != ButtonPress)
+        return;
+
+    /* Ignore when Alt/Meta is held so we never fight WM alt-drag. */
+    if (event->xbutton.state & (Mod1Mask | Mod4Mask))
+        return;
+
+    /* Common X11 mapping: 8 = Back, 9 = Forward (browser-style). */
+    if (event->xbutton.button == 8) {
+        if (app->ctxVisible)
+            context_menu_hide(app);
+        action_back(NULL, app);
+    } else if (event->xbutton.button == 9) {
+        if (app->ctxVisible)
+            context_menu_hide(app);
+        action_forward(NULL, app);
+    }
+}
+
+static void bind_mouse_nav(WMWidget *w, WinderApp *app)
+{
+    if (!w || !app)
+        return;
+    WMCreateEventHandler(WMWidgetView(w), ButtonPressMask,
+                         winder_mouse_nav_handler, app);
+}
+
+static void install_mouse_nav(WinderApp *app)
+{
+    int i;
+
+    if (!app || !app->win)
+        return;
+
+    /* Top-level and chrome */
+    bind_mouse_nav((WMWidget *)app->win, app);
+    bind_mouse_nav((WMWidget *)app->toolbar, app);
+    bind_mouse_nav((WMWidget *)app->pathBar, app);
+    bind_mouse_nav((WMWidget *)app->statusBar, app);
+
+    bind_mouse_nav((WMWidget *)app->btnBack, app);
+    bind_mouse_nav((WMWidget *)app->btnForward, app);
+    bind_mouse_nav((WMWidget *)app->btnUp, app);
+    bind_mouse_nav((WMWidget *)app->btnHome, app);
+    bind_mouse_nav((WMWidget *)app->btnColumns, app);
+    bind_mouse_nav((WMWidget *)app->btnList, app);
+    bind_mouse_nav((WMWidget *)app->btnNewFolder, app);
+    bind_mouse_nav((WMWidget *)app->btnDelete, app);
+    bind_mouse_nav((WMWidget *)app->btnRename, app);
+    bind_mouse_nav((WMWidget *)app->btnOpen, app);
+    bind_mouse_nav((WMWidget *)app->btnRefresh, app);
+    bind_mouse_nav((WMWidget *)app->btnHidden, app);
+    bind_mouse_nav((WMWidget *)app->btnGo, app);
+
+    bind_mouse_nav((WMWidget *)app->pathLabel, app);
+    bind_mouse_nav((WMWidget *)app->pathField, app);
+    bind_mouse_nav((WMWidget *)app->filterLabel, app);
+    bind_mouse_nav((WMWidget *)app->filterField, app);
+
+    /* Sidebar / list / columns */
+    bind_mouse_nav((WMWidget *)app->sidebarFrame, app);
+    bind_mouse_nav((WMWidget *)app->sidebarTitle, app);
+    bind_mouse_nav((WMWidget *)app->sidebar, app);
+    bind_mouse_nav((WMWidget *)app->listPane, app);
+    bind_mouse_nav((WMWidget *)app->listHeader, app);
+    bind_mouse_nav((WMWidget *)app->listView, app);
+    bind_mouse_nav((WMWidget *)app->btnSortName, app);
+    bind_mouse_nav((WMWidget *)app->btnSortSize, app);
+    bind_mouse_nav((WMWidget *)app->btnSortKind, app);
+    bind_mouse_nav((WMWidget *)app->btnSortDate, app);
+    bind_mouse_nav((WMWidget *)app->browser, app);
+
+    /* Preview / Get Info */
+    bind_mouse_nav((WMWidget *)app->previewFrame, app);
+    bind_mouse_nav((WMWidget *)app->previewTitle, app);
+    bind_mouse_nav((WMWidget *)app->previewName, app);
+    bind_mouse_nav((WMWidget *)app->previewBox, app);
+    bind_mouse_nav((WMWidget *)app->previewImage, app);
+    bind_mouse_nav((WMWidget *)app->previewBody, app);
+    bind_mouse_nav((WMWidget *)app->previewKind, app);
+    bind_mouse_nav((WMWidget *)app->previewSize, app);
+    bind_mouse_nav((WMWidget *)app->previewDate, app);
+    bind_mouse_nav((WMWidget *)app->previewPerms, app);
+    bind_mouse_nav((WMWidget *)app->previewPath, app);
+    bind_mouse_nav((WMWidget *)app->statusLabel, app);
+
+    /* Context menu buttons (so side buttons still work if menu is up) */
+    for (i = 0; i < CTX_MENU_MAX_ITEMS; i++)
+        bind_mouse_nav((WMWidget *)app->ctxButtons[i], app);
+    bind_mouse_nav((WMWidget *)app->ctxFrame, app);
+    bind_mouse_nav((WMWidget *)app->ctxMenu, app);
+}
+
+/*
  * Key handler for browse surfaces only (lists, browser columns, chrome).
  * Path and Find text fields do NOT get this handler, so while the user
  * types there, arrows move the caret and '/' inserts a slash.
@@ -1676,11 +1782,15 @@ static void ensure_browser_key_handlers(WinderApp *app)
         if (list) {
             WMCreateEventHandler(WMWidgetView(list), KeyPressMask,
                                  winder_key_handler, app);
+            WMCreateEventHandler(WMWidgetView(list), ButtonPressMask,
+                                 winder_mouse_nav_handler, app);
             context_menu_attach_list(app, list);
         }
     }
     WMCreateEventHandler(WMWidgetView(app->browser), KeyPressMask,
                          winder_key_handler, app);
+    WMCreateEventHandler(WMWidgetView(app->browser), ButtonPressMask,
+                         winder_mouse_nav_handler, app);
 }
 
 void winder_bind_browser_lists(WinderApp *app)
@@ -1741,21 +1851,22 @@ void winder_build_ui(WinderApp *app)
     app->toolbar = WMCreateFrame(app->win);
     WMSetFrameRelief(app->toolbar, WRRaised);
 
-    app->btnBack = make_btn(app->toolbar, "◀", BTN_SM, action_back, app);
-    app->btnForward = make_btn(app->toolbar, "▶", BTN_SM, action_forward, app);
-    app->btnUp = make_btn(app->toolbar, "▲", BTN_SM, action_up, app);
+    app->btnBack = make_btn(app->toolbar, "<", BTN_SM, action_back, app);
+    app->btnForward = make_btn(app->toolbar, ">", BTN_SM, action_forward, app);
+    app->btnUp = make_btn(app->toolbar, "^", BTN_SM, action_up, app);
     app->btnHome = make_btn(app->toolbar, "Home", BTN_W, action_home, app);
 
     app->btnColumns = WMCreateButton(app->toolbar, WBTOnOff);
     WMResizeWidget(app->btnColumns, BTN_W, BTN_H);
     WMSetButtonText(app->btnColumns, "Columns");
     WMSetButtonAction(app->btnColumns, action_view_columns, app);
-    WMSetButtonSelected(app->btnColumns, True);
+    WMSetButtonSelected(app->btnColumns, False);
 
     app->btnList = WMCreateButton(app->toolbar, WBTOnOff);
     WMResizeWidget(app->btnList, BTN_W, BTN_H);
     WMSetButtonText(app->btnList, "List");
     WMSetButtonAction(app->btnList, action_view_list, app);
+    WMSetButtonSelected(app->btnList, True);
 
     app->btnNewFolder = make_btn(app->toolbar, "New…", BTN_W, action_new_folder, app);
     app->btnDelete = make_btn(app->toolbar, "Delete", BTN_W, action_delete, app);
@@ -1926,7 +2037,7 @@ void winder_build_ui(WinderApp *app)
     app->statusLabel = WMCreateLabel(app->statusBar);
     WMSetLabelText(app->statusLabel, "Ready");
 
-    app->viewMode = VIEW_COLUMNS;
+    app->viewMode = VIEW_LIST;
     app->showHidden = False;
     app->browserLoaded = False;
     app->filter[0] = '\0';
@@ -1950,8 +2061,12 @@ void winder_build_ui(WinderApp *app)
     WMUnmapWidget(app->previewBody);
     WMMapWidget(app->previewImage);
 
-    WMMapWidget(app->browser);
-    WMUnmapWidget(app->listPane);
+    /* List is the default view; keep the column browser ready but hidden. */
+    WMUnmapWidget(app->browser);
+    WMMapWidget(app->listPane);
+    WMMapSubwidgets(app->listPane);
+    WMMapSubwidgets(app->listHeader);
+    WMMapWidget(app->listView);
 
     /* Column 0 must be loaded before any path is applied */
     browser_ensure_loaded(app);
@@ -1959,6 +2074,7 @@ void winder_build_ui(WinderApp *app)
 
     context_menu_init(app);
     install_key_handlers(app);
+    install_mouse_nav(app);
 
     winder_layout(app);
 }

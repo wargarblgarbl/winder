@@ -9,6 +9,7 @@
 typedef enum {
     CTX_NONE = 0,
     CTX_OPEN,
+    CTX_OPEN_NEW_WINDOW,
     CTX_RENAME,
     CTX_DUPLICATE,
     CTX_DELETE,
@@ -78,6 +79,9 @@ static void ctx_button_action(WMWidget *self, void *data)
     switch (id) {
     case CTX_OPEN:
         action_open(NULL, app);
+        break;
+    case CTX_OPEN_NEW_WINDOW:
+        action_open_new_window(NULL, app);
         break;
     case CTX_RENAME:
         action_rename(NULL, app);
@@ -264,6 +268,8 @@ void context_menu_show(WinderApp *app, int root_x, int root_y,
     nitems = 0;
     if (has_target) {
         items[nitems++] = (CtxItemDef){ CTX_OPEN, "Open" };
+        if (is_dir)
+            items[nitems++] = (CtxItemDef){ CTX_OPEN_NEW_WINDOW, "Open in New Window" };
         items[nitems++] = (CtxItemDef){ CTX_SEP, "-" };
         items[nitems++] = (CtxItemDef){ CTX_RENAME, "Rename..." };
         items[nitems++] = (CtxItemDef){ CTX_DUPLICATE, "Duplicate" };

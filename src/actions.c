@@ -310,6 +310,30 @@ void action_open(WMWidget *self, void *data)
     wfree(sel);
 }
 
+void action_open_new_window(WMWidget *self, void *data)
+{
+    WinderApp *app = (WinderApp *)data;
+    char *sel;
+    (void)self;
+
+    sel = winder_selected_path(app);
+    if (!sel || !fs_is_dir(sel)) {
+        WMRunAlertPanel(app->scr, app->win, "Open in New Window",
+                        "Select a folder first.", "OK", NULL, NULL);
+        if (sel)
+            wfree(sel);
+        return;
+    }
+    if (fs_open_in_new_window(sel) != 0) {
+        char msg[512];
+        snprintf(msg, sizeof(msg),
+                 "Could not open a new window for:\n%s", sel);
+        WMRunAlertPanel(app->scr, app->win, "Open in New Window",
+                        msg, "OK", NULL, NULL);
+    }
+    wfree(sel);
+}
+
 void action_duplicate(WMWidget *self, void *data)
 {
     WinderApp *app = (WinderApp *)data;
