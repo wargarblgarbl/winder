@@ -1,0 +1,21 @@
+# build
+/winder
+*.o
+*.a
+*.so
+src/*.o
+
+# editor / OS
+*~
+*.swp
+*.swo
+.DS_Store
+.idea/
+.vscode/
+*.code-workspace
+
+# debug
+core
+core.*
+vgcore.*
+*.log
