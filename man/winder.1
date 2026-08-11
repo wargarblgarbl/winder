@@ -1,0 +1,58 @@
+.\" Man page for winder
+.TH WINDER 1 "August 2026" "Winder 0.1.0" "User Commands"
+.SH NAME
+winder \- native WINGs file manager for Window Maker
+.SH SYNOPSIS
+.B winder
+.RI [ directory ]
+.br
+.B winder
+.BR \-h | \-\-help
+.br
+.B winder
+.BR \-V | \-\-version
+.SH DESCRIPTION
+.B winder
+is a Finder-inspired file manager built with the WINGs toolkit used by
+Window Maker. It provides a favorites sidebar, NeXT-style column browsing,
+a list view with sortable headers, Get Info previews (text, images, folders),
+and basic file operations.
+.SH OPTIONS
+.TP
+.I directory
+Open this directory on startup. Defaults to the user's home directory.
+.TP
+.BR \-h ", " \-\-help
+Print a short usage message and exit.
+.TP
+.BR \-V ", " \-\-version
+Print the version and exit.
+.SH KEYBOARD
+When focus is on a browse surface (file list, column browser, or sidebar),
+not the path or Find fields:
+.TP
+.B Up/Down
+Move the selection.
+.TP
+.B Left/Right
+In columns: go to the parent column or open a folder. In list view: go back
+or open the selection.
+.TP
+.B /
+Focus the Find field.
+.TP
+.B Escape
+Return focus to the file view.
+.TP
+.B Enter
+Open the selection.
+.SH FILES
+No configuration files are used yet. Sidebar favorites are derived from the
+user's home directory and common paths.
+.SH SEE ALSO
+.BR wmaker (1),
+.BR xdg-open (1)
+.SH AUTHOR
+Written for Window Maker / WINGs.
+.SH COPYRIGHT
+License GPL-2.0-or-later.

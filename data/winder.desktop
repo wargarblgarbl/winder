@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Winder
+GenericName=File Manager
+Comment=Native WINGs file manager for Window Maker
+Exec=winder %F
+Icon=system-file-manager
+Terminal=false
+Categories=System;FileTools;FileManager;
+StartupNotify=false
+MimeType=inode/directory;
+Keywords=files;browser;folder;WindowMaker;WINGs;

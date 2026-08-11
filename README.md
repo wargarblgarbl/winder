@@ -25,12 +25,26 @@ make
 ./winder ~/Documents
 ```
 
-Install (optional):
+## Install
+
+GNU-style paths. Default prefix is `/usr/local`.
 
 ```sh
-sudo make install          # → /usr/local/bin/winder
-sudo make PREFIX=/usr install
+make
+sudo make install              # bin, man, .desktop, docs
+sudo make install-strip        # same, stripped binary
+sudo make PREFIX=/usr install  # FHS under /usr
+make DESTDIR=/tmp/stage PREFIX=/usr install   # staged package root
+sudo make uninstall
+make print-paths               # show where files will go
 ```
+
+| Path | File |
+|------|------|
+| `$(PREFIX)/bin/winder` | binary |
+| `$(PREFIX)/share/man/man1/winder.1` | man page |
+| `$(PREFIX)/share/applications/winder.desktop` | desktop entry |
+| `$(PREFIX)/share/doc/winder/README.md` | docs |
 
 ## Use
 
