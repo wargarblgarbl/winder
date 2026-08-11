@@ -83,7 +83,8 @@ winder/
     ├── ui.c        # window, layout, views
     ├── actions.c   # toolbar & callbacks
     ├── fsutil.c    # paths, open, format
-    └── history.c   # back / forward stack
+    ├── history.c   # back / forward stack
+    └── menu.c      # right-click context menu
 ```
 
 ## License
