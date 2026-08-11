@@ -1,12 +1,14 @@
 /* Right-click context menu for Winder
  *
  * WINGs has no public popup-menu API, so this is a borderless WMWindow at
- * WMPopUpMenuWindowLevel with a column of command buttons.
+ * WMPopUpMenuWindowLevel with a fixed pool of command buttons (created once
+ * and realized with the menu — never destroyed on each popup).
  */
 #include "winder.h"
 
 typedef enum {
-    CTX_OPEN = 1,
+    CTX_NONE = 0,
+    CTX_OPEN,
     CTX_RENAME,
     CTX_DUPLICATE,
     CTX_DELETE,
@@ -29,52 +31,41 @@ static void ctx_button_action(WMWidget *self, void *data);
 static void ctx_event_handler(XEvent *event, void *data);
 static void list_context_button(XEvent *event, void *data);
 
-static int widget_is_descendant(Display *dpy, Window ancestor, Window w)
+static Window ctx_menu_xid(WinderApp *app)
 {
-    Window root, parent, *kids = NULL;
-    unsigned nk = 0;
-
-    while (w && w != None && w != root) {
-        if (w == ancestor)
-            return 1;
-        if (!XQueryTree(dpy, w, &root, &parent, &kids, &nk))
-            return 0;
-        if (kids)
-            XFree(kids);
-        if (parent == ancestor)
-            return 1;
-        if (parent == root || parent == None)
-            return 0;
-        w = parent;
-    }
-    return 0;
-}
-
-static void ctx_clear_buttons(WinderApp *app)
-{
-    int i;
-
-    for (i = 0; i < app->ctxButtonCount; i++) {
-        if (app->ctxButtons[i]) {
-            WMUnmapWidget(app->ctxButtons[i]);
-            WMDestroyWidget(app->ctxButtons[i]);
-            app->ctxButtons[i] = NULL;
-        }
-    }
-    app->ctxButtonCount = 0;
+    if (!app || !app->ctxMenu)
+        return None;
+    return WMViewXID(WMWidgetView(app->ctxMenu));
 }
 
 void context_menu_hide(WinderApp *app)
 {
     Display *dpy;
+    Window xid;
+    int i;
 
-    if (!app || !app->ctxVisible)
+    if (!app || !app->ctxMenu)
         return;
+
     dpy = WMScreenDisplay(app->scr);
-    XUngrabPointer(dpy, CurrentTime);
-    XUngrabKeyboard(dpy, CurrentTime);
-    WMUnmapWidget(app->ctxMenu);
+    xid = ctx_menu_xid(app);
+
+    if (app->ctxVisible) {
+        XUngrabPointer(dpy, CurrentTime);
+        XUngrabKeyboard(dpy, CurrentTime);
+    }
+
+    /* Hide buttons first (they are realized; safe to unmap). */
+    for (i = 0; i < CTX_MENU_MAX_ITEMS; i++) {
+        if (app->ctxButtons[i] && WMWidgetIsMapped(app->ctxButtons[i]))
+            WMUnmapWidget(app->ctxButtons[i]);
+    }
+
+    if (xid != None && WMWidgetIsMapped(app->ctxMenu))
+        WMUnmapWidget(app->ctxMenu);
+
     app->ctxVisible = 0;
+    app->ctxButtonCount = 0;
 }
 
 static void ctx_button_action(WMWidget *self, void *data)
@@ -128,18 +119,37 @@ static void ctx_event_handler(XEvent *event, void *data)
     WinderApp *app = (WinderApp *)data;
     Window menu_xid;
     Display *dpy;
+    int mx, my;
+    unsigned mw, mh, b, d;
+    Window root;
 
-    if (!app->ctxVisible)
+    if (!app->ctxVisible || !app->ctxMenu)
         return;
 
     dpy = event->xany.display;
-    menu_xid = WMViewXID(WMWidgetView(app->ctxMenu));
+    menu_xid = ctx_menu_xid(app);
+    if (menu_xid == None)
+        return;
 
     switch (event->type) {
-    case ButtonPress:
-        if (!widget_is_descendant(dpy, menu_xid, event->xbutton.window))
+    case ButtonPress: {
+        /*
+         * With an active pointer grab (owner_events=True), outside clicks are
+         * often reported to the grab window. Use root coordinates vs menu
+         * geometry so "click outside" always dismisses.
+         */
+        if (!XGetGeometry(dpy, menu_xid, &root, &mx, &my, &mw, &mh, &b, &d)) {
             context_menu_hide(app);
+            break;
+        }
+        {
+            int rx = event->xbutton.x_root;
+            int ry = event->xbutton.y_root;
+            if (rx < mx || ry < my || rx >= mx + (int)mw || ry >= my + (int)mh)
+                context_menu_hide(app);
+        }
         break;
+    }
     case KeyPress: {
         KeySym ks;
         XLookupString(&event->xkey, NULL, 0, &ks, NULL);
@@ -152,50 +162,32 @@ static void ctx_event_handler(XEvent *event, void *data)
     }
 }
 
-static void ctx_add_button(WinderApp *app, const char *label, CtxActionId id, int y)
-{
-    WMButton *b;
-
-    if (app->ctxButtonCount >= CTX_MENU_MAX_ITEMS)
-        return;
-
-    b = WMCreateCommandButton(app->ctxFrame);
-    WMResizeWidget(b, CTX_MENU_W - 4, CTX_MENU_ITEM_H);
-    WMMoveWidget(b, 2, y);
-    WMSetButtonText(b, label);
-    WMSetButtonTextAlignment(b, WALeft);
-    WMSetButtonAction(b, ctx_button_action, app);
-    WMHangData(b, (void *)(intptr_t)id);
-    WMMapWidget(b);
-    app->ctxButtons[app->ctxButtonCount++] = b;
-}
-
-static void ctx_add_separator(WinderApp *app, int y)
-{
-    WMFrame *line;
-
-    if (app->ctxButtonCount >= CTX_MENU_MAX_ITEMS)
-        return;
-    line = WMCreateFrame(app->ctxFrame);
-    WMSetFrameRelief(line, WRGroove);
-    WMMoveWidget(line, 4, y + 2);
-    WMResizeWidget(line, CTX_MENU_W - 8, 2);
-    WMMapWidget(line);
-    /* store as widget pointer for later destroy */
-    app->ctxButtons[app->ctxButtonCount++] = (WMButton *)line;
-}
-
 void context_menu_init(WinderApp *app)
 {
+    int i;
+
     app->ctxMenu = WMCreateWindowWithStyle(app->scr, "winder-ctx",
                                            WMBorderlessWindowMask);
     WMSetWindowLevel(app->ctxMenu, WMPopUpMenuWindowLevel);
-    WMResizeWidget(app->ctxMenu, CTX_MENU_W, CTX_MENU_ITEM_H * 8);
+    WMResizeWidget(app->ctxMenu, CTX_MENU_W, CTX_MENU_ITEM_H * CTX_MENU_MAX_ITEMS);
 
     app->ctxFrame = WMCreateFrame(app->ctxMenu);
     WMSetFrameRelief(app->ctxFrame, WRRaised);
     WMMoveWidget(app->ctxFrame, 0, 0);
-    WMResizeWidget(app->ctxFrame, CTX_MENU_W, CTX_MENU_ITEM_H * 8);
+    WMResizeWidget(app->ctxFrame, CTX_MENU_W,
+                   CTX_MENU_ITEM_H * CTX_MENU_MAX_ITEMS);
+
+    /* Fixed button pool — realized once with the menu window. */
+    for (i = 0; i < CTX_MENU_MAX_ITEMS; i++) {
+        WMButton *b = WMCreateCommandButton(app->ctxFrame);
+        WMResizeWidget(b, CTX_MENU_W - 4, CTX_MENU_ITEM_H);
+        WMMoveWidget(b, 2, 2 + i * CTX_MENU_ITEM_H);
+        WMSetButtonText(b, "");
+        WMSetButtonTextAlignment(b, WALeft);
+        WMSetButtonAction(b, ctx_button_action, app);
+        WMHangData(b, (void *)(intptr_t)CTX_NONE);
+        app->ctxButtons[i] = b;
+    }
 
     app->ctxButtonCount = 0;
     app->ctxVisible = 0;
@@ -204,8 +196,12 @@ void context_menu_init(WinderApp *app)
     app->clipboardPath[0] = '\0';
 
     WMRealizeWidget(app->ctxMenu);
-    WMMapSubwidgets(app->ctxMenu);
-    WMUnmapWidget(app->ctxMenu);
+    /*
+     * After realize, children have real X windows. Leave everything unmapped
+     * until show. Never Unmap before realize (that caused BadWindow 0x0).
+     */
+    if (WMWidgetIsMapped(app->ctxMenu))
+        WMUnmapWidget(app->ctxMenu);
 
     WMCreateEventHandler(WMWidgetView(app->ctxMenu),
                          ButtonPressMask | KeyPressMask,
@@ -216,17 +212,18 @@ void context_menu_show(WinderApp *app, int root_x, int root_y,
                        const char *path, int is_background)
 {
     CtxItemDef items[CTX_MENU_MAX_ITEMS];
-    int nitems = 0, i, y, h;
+    int nitems = 0, i, y, h, slot;
     int has_target;
     int is_dir = 0;
     Display *dpy;
     int scr_w, scr_h;
+    Window xid;
 
     if (!app || !app->ctxMenu)
         return;
 
+    /* Dismiss any previous popup first. */
     context_menu_hide(app);
-    ctx_clear_buttons(app);
 
     if (path && path[0])
         wstrlcpy(app->ctxPath, path, sizeof(app->ctxPath));
@@ -241,40 +238,63 @@ void context_menu_show(WinderApp *app, int root_x, int root_y,
     nitems = 0;
     if (has_target) {
         items[nitems++] = (CtxItemDef){ CTX_OPEN, "Open" };
-        items[nitems++] = (CtxItemDef){ CTX_SEP, NULL };
-        items[nitems++] = (CtxItemDef){ CTX_RENAME, "Rename…" };
+        items[nitems++] = (CtxItemDef){ CTX_SEP, "-" };
+        items[nitems++] = (CtxItemDef){ CTX_RENAME, "Rename..." };
         items[nitems++] = (CtxItemDef){ CTX_DUPLICATE, "Duplicate" };
-        items[nitems++] = (CtxItemDef){ CTX_DELETE, "Delete…" };
-        items[nitems++] = (CtxItemDef){ CTX_SEP, NULL };
-        items[nitems++] = (CtxItemDef){ CTX_COMPRESS, "Compress…" };
+        items[nitems++] = (CtxItemDef){ CTX_DELETE, "Delete..." };
+        items[nitems++] = (CtxItemDef){ CTX_SEP, "-" };
+        items[nitems++] = (CtxItemDef){ CTX_COMPRESS, "Compress..." };
         items[nitems++] = (CtxItemDef){ CTX_COPY, "Copy" };
         items[nitems++] = (CtxItemDef){ CTX_COPY_PATH, "Copy Path" };
         if (app->clipboardPath[0])
             items[nitems++] = (CtxItemDef){ CTX_PASTE, "Paste" };
         if (is_dir) {
-            items[nitems++] = (CtxItemDef){ CTX_SEP, NULL };
+            items[nitems++] = (CtxItemDef){ CTX_SEP, "-" };
             items[nitems++] = (CtxItemDef){ CTX_TERMINAL, "Open Terminal Here" };
         }
     } else {
-        items[nitems++] = (CtxItemDef){ CTX_NEW_FOLDER, "New Folder…" };
+        items[nitems++] = (CtxItemDef){ CTX_NEW_FOLDER, "New Folder..." };
         items[nitems++] = (CtxItemDef){ CTX_RELOAD, "Reload" };
         if (app->clipboardPath[0])
             items[nitems++] = (CtxItemDef){ CTX_PASTE, "Paste" };
-        items[nitems++] = (CtxItemDef){ CTX_SEP, NULL };
+        items[nitems++] = (CtxItemDef){ CTX_SEP, "-" };
         items[nitems++] = (CtxItemDef){ CTX_TERMINAL, "Open Terminal Here" };
         items[nitems++] = (CtxItemDef){ CTX_COPY_PATH, "Copy Path" };
     }
 
+    if (nitems > CTX_MENU_MAX_ITEMS)
+        nitems = CTX_MENU_MAX_ITEMS;
+
     y = 2;
+    slot = 0;
     for (i = 0; i < nitems; i++) {
+        WMButton *b = app->ctxButtons[slot];
+        if (!b)
+            break;
+
         if (items[i].id == CTX_SEP) {
-            ctx_add_separator(app, y);
-            y += 6;
+            WMSetButtonText(b, "----------");
+            WMSetButtonEnabled(b, False);
+            WMHangData(b, (void *)(intptr_t)CTX_NONE);
         } else {
-            ctx_add_button(app, items[i].label, items[i].id, y);
-            y += CTX_MENU_ITEM_H;
+            WMSetButtonText(b, items[i].label);
+            WMSetButtonEnabled(b, True);
+            WMHangData(b, (void *)(intptr_t)items[i].id);
         }
+        WMMoveWidget(b, 2, y);
+        WMResizeWidget(b, CTX_MENU_W - 4, CTX_MENU_ITEM_H);
+        WMMapWidget(b);
+        y += CTX_MENU_ITEM_H;
+        slot++;
     }
+    app->ctxButtonCount = slot;
+
+    /* Ensure unused pool buttons stay hidden */
+    for (i = slot; i < CTX_MENU_MAX_ITEMS; i++) {
+        if (app->ctxButtons[i] && WMWidgetIsMapped(app->ctxButtons[i]))
+            WMUnmapWidget(app->ctxButtons[i]);
+    }
+
     y += 2;
     h = y;
     if (h < CTX_MENU_ITEM_H * 2)
@@ -297,18 +317,34 @@ void context_menu_show(WinderApp *app, int root_x, int root_y,
 
     WMSetWindowInitialPosition(app->ctxMenu, root_x, root_y);
     WMSetWindowUserPosition(app->ctxMenu, root_x, root_y);
+
+    /* Top-level first, then frame, then buttons (WINGs/X parent order). */
     WMMapWidget(app->ctxMenu);
-    WMMapSubwidgets(app->ctxMenu);
-    WMMapSubwidgets(app->ctxFrame);
+    WMMapWidget(app->ctxFrame);
+    for (i = 0; i < app->ctxButtonCount; i++)
+        WMMapWidget(app->ctxButtons[i]);
+
+    xid = ctx_menu_xid(app);
+    if (xid == None) {
+        context_menu_hide(app);
+        return;
+    }
+
+    XRaiseWindow(dpy, xid);
     WMSetFocusToWidget(app->ctxMenu);
 
-    XGrabPointer(dpy, WMViewXID(WMWidgetView(app->ctxMenu)), True,
+    /*
+     * owner_events=False so outside clicks are delivered to the grab window
+     * and our handler can dismiss via root coordinates.
+     */
+    XGrabPointer(dpy, xid, False,
                  ButtonPressMask | ButtonReleaseMask,
                  GrabModeAsync, GrabModeAsync, None, None, CurrentTime);
-    XGrabKeyboard(dpy, WMViewXID(WMWidgetView(app->ctxMenu)), True,
+    XGrabKeyboard(dpy, xid, False,
                   GrabModeAsync, GrabModeAsync, CurrentTime);
 
     app->ctxVisible = 1;
+    XFlush(dpy);
 }
 
 static int list_row_at_y(WMList *list, int y)
