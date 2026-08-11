@@ -5,6 +5,7 @@
 static void ensure_browser_key_handlers(WinderApp *app);
 static void focus_file_surface(WinderApp *app);
 static void install_key_handlers(WinderApp *app);
+static void winder_key_handler(XEvent *event, void *data);
 
 /* ---- sort helpers ---- */
 #define CAST_ITEM(p) (*((WMListItem **)(p)))
@@ -165,7 +166,6 @@ void fill_browser_column(WMBrowserDelegate *self, WMBrowser *bPtr,
     WinderApp *app = (WinderApp *)self->data;
     char *path;
 
-    (void)list;
     (void)bPtr;
 
     if (column > 0)
@@ -175,6 +175,17 @@ void fill_browser_column(WMBrowserDelegate *self, WMBrowser *bPtr,
 
     list_directory_on_column(app, column, path);
     wfree(path);
+
+    /*
+     * New columns are created as the user drills in. Attach keyboard and
+     * right-click handlers to each column list as soon as it is filled —
+     * otherwise only the first few columns (from initial load) get them.
+     */
+    if (list) {
+        WMCreateEventHandler(WMWidgetView(list), KeyPressMask,
+                             winder_key_handler, app);
+        context_menu_attach_list(app, list);
+    }
 }
 
 /* ---- list view (pixel-aligned columns under header) ---- */
@@ -1670,6 +1681,11 @@ static void ensure_browser_key_handlers(WinderApp *app)
     }
     WMCreateEventHandler(WMWidgetView(app->browser), KeyPressMask,
                          winder_key_handler, app);
+}
+
+void winder_bind_browser_lists(WinderApp *app)
+{
+    ensure_browser_key_handlers(app);
 }
 
 static void install_key_handlers(WinderApp *app)

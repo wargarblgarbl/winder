@@ -305,6 +305,8 @@ void populate_list_view(WinderApp *app);
 void populate_sidebar(WinderApp *app);
 void list_update_sort_headers(WinderApp *app);
 void browser_ensure_loaded(WinderApp *app);
+/* Attach key/right-click handlers to every current browser column list. */
+void winder_bind_browser_lists(WinderApp *app);
 
 void close_app(WMWidget *self, void *data);
 

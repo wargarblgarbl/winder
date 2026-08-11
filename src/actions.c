@@ -485,6 +485,9 @@ void browser_click(WMWidget *self, void *data)
         winder_update_status(app);
         wfree(path);
     }
+
+    /* Rebind keys/right-click on any columns created by this selection. */
+    winder_bind_browser_lists(app);
 }
 
 void browser_dclick(WMWidget *self, void *data)

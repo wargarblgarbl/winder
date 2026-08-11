@@ -395,7 +395,7 @@ static void list_context_button(XEvent *event, void *data)
 {
     WinderApp *app = (WinderApp *)data;
     WMList *list = NULL;
-    WMList *candidates[12];
+    WMList *candidates[64];
     int nc = 0, i, c, cols, row, background = 0;
     char *path = NULL;
     int root_x, root_y;
@@ -407,7 +407,7 @@ static void list_context_button(XEvent *event, void *data)
     candidates[nc++] = app->sidebar;
     if (app->browser) {
         cols = WMGetBrowserNumberOfColumns(app->browser);
-        for (c = 0; c < cols && nc < 12; c++) {
+        for (c = 0; c < cols && nc < 64; c++) {
             WMList *cl = WMGetBrowserListInColumn(app->browser, c);
             if (cl)
                 candidates[nc++] = cl;
